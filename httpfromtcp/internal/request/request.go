@@ -46,6 +46,11 @@ func (r *Request) parse(data []byte) (int, error) {
 
 }
 
+// String() returns the RequestLine as a string
+func (r *Request) String() string {
+	return fmt.Sprintf("Request line: \n- Method: %s\n- Target: %s\n- Version: %s\n", r.RequestLine.Method, r.RequestLine.RequestTarget, r.RequestLine.HttpVersion)
+}
+
 type RequestLine struct {
 	HttpVersion   string
 	RequestTarget string

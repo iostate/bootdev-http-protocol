@@ -40,7 +40,16 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 			return 0, false, fmt.Errorf("failed to parse header key")
 		}
 	}
+
+	keyStr := strings.ToLower(string(key))
 	value := bytes.TrimSpace(parts[1])
+	valueStr := strings.ToLower(string(value))
+
+	// Check if key already exists
+	if _, ok := h[keyStr]; ok {
+		h[keyStr] += "," + valueStr
+	}
+
 	h[strings.ToLower(string(key))] = string(value)
 	return idx + len(crlf), false, nil
 

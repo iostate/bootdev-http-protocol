@@ -32,4 +32,12 @@ func TestHeaders(t *testing.T) {
 	n, done, err = headers.Parse(data)
 	require.Error(t, err)
 
+	headers = NewHeaders()
+	data = []byte("Set-Person: lane-loves-go\r\nSet-Person: prime-loves-zig\r\nSet-Person: tj-loves-ocaml\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	assert.Contains(t, "lane-loves-go", headers["Set-Persion"])
+	assert.Contains(t, "prime-loves-zig", headers["Set-Persion"])
+	assert.Contains(t, "tj-loves-ocaml", headers["Set-Persion"])
+
 }

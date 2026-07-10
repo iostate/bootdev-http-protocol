@@ -24,7 +24,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf(req.String())
+		fmt.Print(req.String())
 
 		fmt.Println("connection closed")
 	}

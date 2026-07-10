@@ -3,6 +3,7 @@ package headers
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -31,8 +32,27 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if !bytes.Equal(parts[0], bytes.TrimSpace(parts[0])) {
 		return 0, false, fmt.Errorf("failed to parse header key")
 	}
+	if len(key) == 0 {
+		return 0, false, fmt.Errorf("invalid header key with length 0")
+	}
+	for _, c := range key {
+		if !isValidHeaderKeyChar(c) {
+			return 0, false, fmt.Errorf("failed to parse header key")
+		}
+	}
 	value := bytes.TrimSpace(parts[1])
-	h[string(key)] = string(value)
+	h[strings.ToLower(string(key))] = string(value)
 	return idx + len(crlf), false, nil
 
+}
+func isValidHeaderKeyChar(c byte) bool {
+	if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+		return true
+	}
+	switch c {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
 }

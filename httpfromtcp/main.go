@@ -22,10 +22,16 @@ func main() {
 		fmt.Println("Connection has been accepted")
 		req, err := request.RequestFromReader(conn)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			conn.Close()
+			continue
 		}
 		fmt.Print(req.String())
-
+		fmt.Printf("Headers:\n")
+		for key, val := range req.Headers {
+			fmt.Printf("- %s: %s\n", key, val)
+		}
+		conn.Close()
 		fmt.Println("connection closed")
 	}
 

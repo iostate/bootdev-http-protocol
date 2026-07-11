@@ -28,13 +28,27 @@ type Request struct {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.State != requestStateDone && totalBytesParsed < len(data) {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return totalBytesParsed, err
+		}
+		if n == 0 {
+			break
+		}
+		totalBytesParsed += n
+	}
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.State {
 	case requestStateInitialized:
 		requestLine, n, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
 		}
-		// still consuming
 		if n == 0 {
 			return 0, nil
 		}
@@ -46,20 +60,15 @@ func (r *Request) parse(data []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if !done {
-			return n, nil
-		}
 		if done {
 			r.State = requestStateDone
 		}
 		return n, nil
-
 	case requestStateDone:
 		return 0, fmt.Errorf("should not be parsing anymore, we are done")
 	default:
 		return 0, fmt.Errorf("unknown error state")
 	}
-
 }
 
 // String() returns the RequestLine as a string

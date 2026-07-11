@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"fmt"
+	"httpfromtcp/internal/headers"
 	"io"
 	"strings"
 )
@@ -15,18 +16,20 @@ const (
 type requestStatus int
 
 const (
-	Initialized requestStatus = iota // 0
-	Done                             // 1
+	requestStateInitialized    requestStatus = iota // 0
+	requestStateDone                                // 1
+	requestStateParsingHeaders                      //2
 )
 
 type Request struct {
+	Headers     headers.Headers
 	RequestLine RequestLine
 	State       requestStatus
 }
 
 func (r *Request) parse(data []byte) (int, error) {
 	switch r.State {
-	case Initialized:
+	case requestStateInitialized:
 		requestLine, n, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
@@ -35,10 +38,23 @@ func (r *Request) parse(data []byte) (int, error) {
 		if n == 0 {
 			return 0, nil
 		}
-		r.State = Done
+		r.State = requestStateParsingHeaders
 		r.RequestLine = *requestLine
 		return n, nil
-	case Done:
+	case requestStateParsingHeaders:
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if !done {
+			return n, nil
+		}
+		if done {
+			r.State = requestStateDone
+		}
+		return n, nil
+
+	case requestStateDone:
 		return 0, fmt.Errorf("should not be parsing anymore, we are done")
 	default:
 		return 0, fmt.Errorf("unknown error state")
@@ -61,9 +77,12 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 	buf := make([]byte, bufferSize, bufferSize)
 	readToIndex := 0
-	request := &Request{State: Initialized}
+	request := &Request{
+		State:   requestStateInitialized,
+		Headers: headers.NewHeaders(),
+	}
 
-	for request.State != Done {
+	for request.State != requestStateDone {
 		// Grow buffer
 		if len(buf) == readToIndex {
 			newSlice := make([]byte, len(buf)*2, len(buf)*2)
@@ -73,7 +92,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if err == io.EOF {
-				request.State = Done
+				if request.State != requestStateDone {
+					return request, fmt.Errorf("incomplete request: unexpected EOF")
+				}
 				break
 			}
 			return nil, fmt.Errorf("error reading from reader: %v", err)

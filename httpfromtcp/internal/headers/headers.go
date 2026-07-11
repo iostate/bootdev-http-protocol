@@ -23,10 +23,10 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	if idx == 0 {
-		return idx, true, nil
+		return len(crlf), true, nil
 	}
 
-	// idx > 0 branch
+	// idx > 0 branch = real header line found
 	parts := bytes.SplitN(data[:idx], []byte(":"), 2)
 	key := parts[0]
 	if !bytes.Equal(parts[0], bytes.TrimSpace(parts[0])) {
@@ -47,10 +47,11 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	// Check if key already exists
 	if _, ok := h[keyStr]; ok {
-		h[keyStr] += "," + valueStr
+		h[keyStr] += ", " + valueStr
+	} else {
+		h[keyStr] = valueStr
 	}
 
-	h[strings.ToLower(string(key))] = string(value)
 	return idx + len(crlf), false, nil
 
 }

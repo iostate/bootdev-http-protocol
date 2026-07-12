@@ -36,5 +36,4 @@ func main() {
 		conn.Close()
 		fmt.Println("connection closed")
 	}
-
 }

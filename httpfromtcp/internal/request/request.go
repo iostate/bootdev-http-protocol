@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"httpfromtcp/internal/headers"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -18,11 +19,13 @@ type requestStatus int
 const (
 	requestStateInitialized    requestStatus = iota // 0
 	requestStateDone                                // 1
-	requestStateParsingHeaders                      //2
+	requestStateParsingHeaders                      // 2
+	requestStateParsingBody                         // 3
 )
 
 type Request struct {
 	Headers     headers.Headers
+	Body        []byte
 	RequestLine RequestLine
 	State       requestStatus
 }
@@ -61,9 +64,45 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
-			r.State = requestStateDone
+			contentLenStr := r.Headers.Get("Content-Length")
+			if contentLenStr == "" {
+				r.State = requestStateDone
+			} else {
+				contentLen, err := strconv.Atoi(contentLenStr)
+				if err != nil {
+					return 0, fmt.Errorf("malformed Content-Length: %v", err)
+				}
+				if contentLen == 0 {
+					r.State = requestStateDone
+				} else {
+					r.State = requestStateParsingBody
+				}
+			}
 		}
 		return n, nil
+	case requestStateParsingBody:
+		contentLenStr := r.Headers.Get("Content-Length")
+		if contentLenStr == "" {
+			r.State = requestStateDone
+			return len(data), nil
+		}
+
+		contentLen, err := strconv.Atoi(contentLenStr)
+		if err != nil {
+			return 0, err
+		}
+
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > contentLen {
+			return 0, fmt.Errorf("req body (%d) than content-length (%d)", len(r.Body), contentLen)
+		}
+
+		if len(r.Body) == contentLen {
+			r.State = requestStateDone
+		}
+
+		return len(data), nil
+
 	case requestStateDone:
 		return 0, fmt.Errorf("should not be parsing anymore, we are done")
 	default:

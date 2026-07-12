@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"httpfromtcp/internal/response"
 	"log"
 	"net"
 	"strconv"
@@ -39,12 +41,15 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
-	response := "HTTP/1.1 200 OK\r\n" +
-		"Content-Type: text/plain\r\n" +
-		"Content-Length: 13\r\n" +
-		"\r\n" +
-		"Hello World!\n"
-	conn.Write([]byte(response))
+	defaultHeaders := response.GetDefaultHeaders(0)
+
+	if err := response.WriteStatusLine(conn, response.Ok); err != nil {
+		fmt.Printf("failed to write status line, error: %v", err)
+	}
+	if err := response.WriteHeaders(conn, defaultHeaders); err != nil {
+		fmt.Printf("failed to write headers, error: %v", err)
+	}
+	conn.Write([]byte("\r\n"))
 }
 
 func Serve(port int) (*Server, error) {

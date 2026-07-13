@@ -1,7 +1,10 @@
 package main
 
 import (
+	"httpfromtcp/internal/request"
+	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -10,8 +13,21 @@ import (
 
 const port = 42069
 
+func handler(w io.Writer, req *request.Request) *server.HandlerError {
+
+	switch req.RequestLine.RequestTarget {
+	case "/yourproblem":
+		return server.NewHandlerError(response.BadRequest, "Your problem is not my problem\n")
+	case "/myproblem":
+		return server.NewHandlerError(response.InternalServerError, "Woopsie, my bad\n")
+	default:
+		w.Write([]byte("All good, frfr\n"))
+		return nil
+	}
+}
+
 func main() {
-	server, err := server.Serve(port)
+	server, err := server.Serve(port, handler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}

@@ -17,9 +17,9 @@ func handler(w io.Writer, req *request.Request) *server.HandlerError {
 
 	switch req.RequestLine.RequestTarget {
 	case "/yourproblem":
-		return server.NewHandlerError(response.BadRequest, "Your problem is not my problem\n")
+		return server.NewHandlerError(response.StatusBadRequest, "Your problem is not my problem\n")
 	case "/myproblem":
-		return server.NewHandlerError(response.InternalServerError, "Woopsie, my bad\n")
+		return server.NewHandlerError(response.StatusInternalServerError, "Woopsie, my bad\n")
 	default:
 		w.Write([]byte("All good, frfr\n"))
 		return nil

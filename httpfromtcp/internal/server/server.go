@@ -48,7 +48,12 @@ func (s *Server) handle(conn net.Conn) {
 
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
+		handlerError := &HandlerError{
+			Code:    response.StatusBadRequest,
+			Message: err.Error(),
+		}
 		fmt.Printf("failed to read request, error: %v", err)
+		handlerError.Write(conn)
 		return
 	}
 
@@ -71,7 +76,7 @@ func (s *Server) handle(conn net.Conn) {
 
 	defaultHeaders := response.GetDefaultHeaders(buf.Len())
 
-	if err := response.WriteStatusLine(conn, response.Ok); err != nil {
+	if err := response.WriteStatusLine(conn, response.StatusOk); err != nil {
 		fmt.Printf("failed to write status line, error: %v", err)
 	}
 	if err := response.WriteHeaders(conn, defaultHeaders); err != nil {

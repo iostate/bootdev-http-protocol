@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -68,11 +69,48 @@ func httpbinProxyHandler(w *response.Writer, req *request.Request) {
 	}
 }
 
+func videoHandler(w *response.Writer, req *request.Request) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("error getting working directory: %v\n", err)
+		return
+	}
+
+	// repo root when `go run .` from httpfromtcp/cmd; else assets/ at cwd (bootdev)
+	candidates := []string{
+		filepath.Join(cwd, "assets", "vim.mp4"),
+		filepath.Join(cwd, "..", "..", "assets", "vim.mp4"),
+	}
+
+	var file []byte
+	for _, videoPath := range candidates {
+		file, err = os.ReadFile(videoPath)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		fmt.Printf("error reading video file: %v\n", err)
+		return
+	}
+
+	h := response.GetDefaultHeaders(len(file))
+	h["Content-Type"] = "video/mp4"
+	w.WriteStatusLine(response.StatusOk)
+	w.WriteHeaders(h)
+	w.WriteBody(file)
+}
+
 func handler(w *response.Writer, req *request.Request) {
 	target := req.RequestLine.RequestTarget
 
 	if strings.HasPrefix(target, "/httpbin") {
 		httpbinProxyHandler(w, req)
+		return
+	}
+
+	if strings.HasPrefix(target, "/video") {
+		videoHandler(w, req)
 		return
 	}
 

@@ -1,19 +1,68 @@
 package main
 
 import (
+	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
 const port = 42069
 
+func httpbinProxyHandler(w *response.Writer, req *request.Request) {
+	path := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
+	upstream, err := http.Get("https://httpbin.org" + path)
+	if err != nil {
+		fmt.Printf("error making request to url %s: %v\n", path, err)
+		return
+	}
+	defer upstream.Body.Close()
+
+	h := response.GetDefaultHeaders(0)
+	delete(h, "Content-Length")
+	h["Transfer-Encoding"] = "chunked"
+	h["Content-Type"] = "text/plain"
+
+	w.WriteStatusLine(response.StatusOk)
+	w.WriteHeaders(h)
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := upstream.Body.Read(buf)
+		if n > 0 {
+			_, writeErr := w.WriteChunkedBody(buf[:n])
+			if writeErr != nil {
+				fmt.Printf("error writing chunked body: %v\n", writeErr)
+				return
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Printf("error reading upstream body: %v\n", err)
+			break
+		}
+	}
+	w.WriteChunkedBodyDone()
+}
+
 func handler(w *response.Writer, req *request.Request) {
-	switch req.RequestLine.RequestTarget {
+	target := req.RequestLine.RequestTarget
+
+	if strings.HasPrefix(target, "/httpbin") {
+		httpbinProxyHandler(w, req)
+		return
+	}
+
+	switch target {
 	case "/yourproblem":
 		body := []byte(`<html>
   <head>

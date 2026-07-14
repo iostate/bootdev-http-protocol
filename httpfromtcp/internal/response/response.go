@@ -74,6 +74,37 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 	return w.writer.Write(p)
 }
 
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	if w.writerState != StateWriteBody {
+		return 0, fmt.Errorf("not in the correct state, state: %s", w.writerState)
+	}
+
+	if len(p) == 0 {
+		return 0, fmt.Errorf("empty chunk")
+	}
+
+	out := make([]byte, 0, len(p)+32)
+	out = append(out, fmt.Sprintf("%x\r\n", len(p))...)
+	out = append(out, p...)
+	out = append(out, "\r\n"...)
+
+	if _, err := w.writer.Write(out); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	if w.writerState != StateWriteBody {
+		return 0, fmt.Errorf("not in the correct state, state: %s", w.writerState)
+	}
+	n, err := w.writer.Write([]byte("0\r\n\r\n"))
+	if err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
 func (w *Writer) WriteHeaders(headers headers.Headers) error {
 	if w.writerState != StateWriteHeaders {
 		return fmt.Errorf("not in the correct state, state: %s", w.writerState)

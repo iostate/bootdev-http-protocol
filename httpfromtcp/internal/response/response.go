@@ -98,7 +98,7 @@ func (w *Writer) WriteChunkedBodyDone() (int, error) {
 	if w.writerState != StateWriteBody {
 		return 0, fmt.Errorf("not in the correct state, state: %s", w.writerState)
 	}
-	n, err := w.writer.Write([]byte("0\r\n\r\n"))
+	n, err := w.writer.Write([]byte("0\r\n"))
 	if err != nil {
 		return n, err
 	}
@@ -120,5 +120,21 @@ func (w *Writer) WriteHeaders(headers headers.Headers) error {
 	}
 
 	w.writerState = StateWriteBody
+	return nil
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	if w.writerState != StateWriteBody {
+		return fmt.Errorf("not in the correct state, state: %s", w.writerState)
+	}
+	for key, value := range h {
+		if _, err := w.writer.Write([]byte(key + ": " + value + "\r\n")); err != nil {
+			return err
+		}
+	}
+	// blank line ends the trailer section (the second \r\n after 0\r\n...)
+	if _, err := w.writer.Write([]byte("\r\n")); err != nil {
+		return err
+	}
 	return nil
 }

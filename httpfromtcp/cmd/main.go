@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"httpfromtcp/internal/headers"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
@@ -29,16 +31,19 @@ func httpbinProxyHandler(w *response.Writer, req *request.Request) {
 	delete(h, "Content-Length")
 	h["Transfer-Encoding"] = "chunked"
 	h["Content-Type"] = "text/plain"
+	h["Trailer"] = "X-Content-SHA256, X-Content-Length"
 
 	w.WriteStatusLine(response.StatusOk)
 	w.WriteHeaders(h)
 
+	var fullBody []byte
 	buf := make([]byte, 1024)
 	for {
 		n, err := upstream.Body.Read(buf)
 		if n > 0 {
-			_, writeErr := w.WriteChunkedBody(buf[:n])
-			if writeErr != nil {
+			chunk := buf[:n]
+			fullBody = append(fullBody, chunk...)
+			if _, writeErr := w.WriteChunkedBody(chunk); writeErr != nil {
 				fmt.Printf("error writing chunked body: %v\n", writeErr)
 				return
 			}
@@ -51,7 +56,16 @@ func httpbinProxyHandler(w *response.Writer, req *request.Request) {
 			break
 		}
 	}
+
 	w.WriteChunkedBodyDone()
+
+	sum := sha256.Sum256(fullBody)
+	trailers := headers.NewHeaders()
+	trailers["X-Content-SHA256"] = fmt.Sprintf("%x", sum)
+	trailers["X-Content-Length"] = fmt.Sprintf("%d", len(fullBody))
+	if err := w.WriteTrailers(trailers); err != nil {
+		fmt.Printf("error writing trailers: %v\n", err)
+	}
 }
 
 func handler(w *response.Writer, req *request.Request) {

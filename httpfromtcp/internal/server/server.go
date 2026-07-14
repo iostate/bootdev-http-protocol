@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
@@ -46,6 +45,8 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
+	w := response.NewWriter(conn)
+
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
 		handlerError := &HandlerError{
@@ -53,37 +54,11 @@ func (s *Server) handle(conn net.Conn) {
 			Message: err.Error(),
 		}
 		fmt.Printf("failed to read request, error: %v", err)
-		handlerError.Write(conn)
+		handlerError.Write(w)
 		return
 	}
 
-	buf := bytes.Buffer{}
-	if handlerErr := s.handler(&buf, req); handlerErr != nil {
-		messageBytes := []byte(handlerErr.Message)
-		if err := response.WriteStatusLine(conn, handlerErr.Code); err != nil {
-			fmt.Printf("failed to write status line, error: %v", err)
-			return
-		}
-		errHeaders := response.GetDefaultHeaders(len(messageBytes))
-		if err := response.WriteHeaders(conn, errHeaders); err != nil {
-			fmt.Printf("failed to write headers, error: %v", err)
-			return
-		}
-		conn.Write([]byte("\r\n"))
-		conn.Write(messageBytes)
-		return
-	}
-
-	defaultHeaders := response.GetDefaultHeaders(buf.Len())
-
-	if err := response.WriteStatusLine(conn, response.StatusOk); err != nil {
-		fmt.Printf("failed to write status line, error: %v", err)
-	}
-	if err := response.WriteHeaders(conn, defaultHeaders); err != nil {
-		fmt.Printf("failed to write headers, error: %v", err)
-	}
-	conn.Write([]byte("\r\n"))
-	conn.Write(buf.Bytes())
+	s.handler(w, req)
 }
 
 func Serve(port int, handler Handler) (*Server, error) {
